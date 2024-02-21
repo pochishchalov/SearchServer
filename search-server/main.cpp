@@ -1,7 +1,4 @@
-// Решите загадку: Сколько чисел от 1 до 1000 содержат как минимум одну цифру 3?
-// Напишите ответ здесь: 271
-
-// Закомитьте изменения и отправьте их в свой репозиторий.
+// �������� ������ ��������� ������� � ������������� �� TF-IDF
 
 #include <algorithm>
 #include <cmath>
@@ -65,9 +62,12 @@ public:
 
     void AddDocument(int document_id, const string& document) {
         const vector<string> words = SplitIntoWordsNoStop(document);
-        if (!words.empty()) ++document_count_;
-        for (const string& word : words) {
-            word_to_document_freqs_[word][document_id] += (1. / words.size());
+        if (!words.empty()) {
+            ++document_count_;
+            double freq_index = 1. / words.size();
+            for (const string& word : words) {
+                word_to_document_freqs_[word][document_id] += freq_index;
+            }
         }
     }
 
