@@ -1,4 +1,4 @@
-// Релизная версия поисковой системы с ранжированием по TF-IDF
+// Release version of the search system with TF-IDF ranking
 
 #include <algorithm>
 #include <cmath>
