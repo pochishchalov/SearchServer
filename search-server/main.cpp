@@ -5,6 +5,7 @@
 #include <cmath>
 #include <iostream>
 #include <map>
+#include <numeric>
 #include <set>
 #include <stdexcept>
 #include <string>
@@ -14,6 +15,7 @@
 using namespace std;
 
 const int MAX_RESULT_DOCUMENT_COUNT = 5;
+const double EPSILON = 1e-6;
 
 string ReadLine() {
     string s;
@@ -103,7 +105,11 @@ public:
         if (document_id < 0) {
             throw invalid_argument("Negative Document ID!"s);
         }
-        if (documents_.count(document_id)) {
+        if (count_if(documents_.begin(), documents_.end(),
+            [document_id](const DocumentData& document) {
+                return document.id == document_id;
+            }))
+        {
             throw invalid_argument("A document with this ID already exists!"s);
         }
         const vector<string> words = SplitIntoWordsNoStop(document);
@@ -111,7 +117,7 @@ public:
         for (const string& word : words) {
             word_to_document_freqs_[word][document_id] += inv_word_count;
         }
-        documents_.emplace(document_id, DocumentData{ ComputeAverageRating(ratings), status });
+        documents_.push_back({ document_id, ComputeAverageRating(ratings), status });
     }
 
     template <typename DocumentPredicate>
@@ -121,7 +127,7 @@ public:
         auto matched_documents = FindAllDocuments(query, document_predicate);
         sort(matched_documents.begin(), matched_documents.end(),
             [](const Document& lhs, const Document& rhs) {
-                if (abs(lhs.relevance - rhs.relevance) < 1e-6) {
+                if (abs(lhs.relevance - rhs.relevance) < EPSILON) {
                     return lhs.rating > rhs.rating;
                 }
                 else {
@@ -150,11 +156,7 @@ public:
     }
 
     int GetDocumentId(int index) const {
-        if (index < 0 || index >= GetDocumentCount()) {
-            throw out_of_range("The requested index is out of range!");
-        }
-        const auto result = next(documents_.begin(), index);
-        return result->first;
+        return documents_.at(index).id;
     }
 
     tuple<vector<string>, DocumentStatus> MatchDocument(const string& raw_query,
@@ -178,17 +180,22 @@ public:
                 break;
             }
         }
-        return { matched_words, documents_.at(document_id).status };
+        const auto document = find_if(documents_.begin(), documents_.end(),
+            [document_id](const DocumentData& document) {
+                return document.id == document_id;
+            });
+        return { matched_words, document->status };
     }
 
 private:
     struct DocumentData {
+        int id;
         int rating;
         DocumentStatus status;
     };
     const set<string> stop_words_;
     map<string, map<int, double>> word_to_document_freqs_;
-    map<int, DocumentData> documents_;
+    vector<DocumentData> documents_;
 
     bool IsStopWord(const string& word) const {
         return stop_words_.count(word) > 0;
@@ -211,11 +218,7 @@ private:
         if (ratings.empty()) {
             return 0;
         }
-        int rating_sum = 0;
-        for (const int rating : ratings) {
-            rating_sum += rating;
-        }
-        return rating_sum / static_cast<int>(ratings.size());
+        return accumulate(ratings.begin(), ratings.end(), 0) / static_cast<int>(ratings.size());
     }
 
     struct QueryWord {
@@ -225,6 +228,9 @@ private:
     };
 
     QueryWord ParseQueryWord(string text) const {
+        if (!IsValidWord(text)) {
+            throw invalid_argument("The request contains invalid special characters!"s);
+        }
         bool is_minus = false;
         if (text[0] == '-') {
             is_minus = true;
@@ -247,9 +253,6 @@ private:
     Query ParseQuery(const string& text) const {
         Query query;
         for (const string& word : SplitIntoWords(text)) {
-            if (!IsValidWord(word)) {
-                throw invalid_argument("The request contains invalid special characters!"s);
-            }
             const QueryWord query_word = ParseQueryWord(word);
             if (!query_word.is_stop) {
                 if (query_word.is_minus) {
@@ -278,8 +281,10 @@ private:
             }
             const double inverse_document_freq = ComputeWordInverseDocumentFreq(word);
             for (const auto& [document_id, term_freq] : word_to_document_freqs_.at(word)) {
-                const auto& document_data = documents_.at(document_id);
-                if (document_predicate(document_id, document_data.status, document_data.rating)) {
+                const auto& document_data = find_if(documents_.begin(), documents_.end(), [document_id](DocumentData d) {
+                    return d.id == document_id;
+                    });
+                if (document_predicate(document_id, document_data->status, document_data->rating)) {
                     document_to_relevance[document_id] += term_freq * inverse_document_freq;
                 }
             }
@@ -296,8 +301,12 @@ private:
 
         vector<Document> matched_documents;
         for (const auto& [document_id, relevance] : document_to_relevance) {
+            const auto document = find_if(documents_.begin(), documents_.end(),
+                [document_id](const DocumentData& document) {
+                    return document.id == document_id;
+                });
             matched_documents.push_back(
-                { document_id, relevance, documents_.at(document_id).rating });
+                { document_id, relevance, document->rating });
         }
         return matched_documents;
     }
@@ -318,11 +327,11 @@ void PrintDocument(const Document& document) {
         << "relevance = "s << document.relevance << ", "s
         << "rating = "s << document.rating << " }"s << endl;
 }
-int main(){
+int main() {
     SearchServer search_server("and in on"s);
     search_server.AddDocument(0, "white cat and fashionable collar"s, DocumentStatus::ACTUAL, { 8, -3 });
-    search_server.AddDocument(1, "fluffy cat fluffy tail"s, DocumentStatus::ACTUAL, { 7, 2, 7 });
-    search_server.AddDocument(2, "well-groomed dog expressive eyes"s, DocumentStatus::ACTUAL, { 5, -12, 2, 1 });
+    search_server.AddDocument(98, "fluffy cat fluffy tail"s, DocumentStatus::ACTUAL, { 7, 2, 7 });
+    search_server.AddDocument(49, "well-groomed dog expressive eyes"s, DocumentStatus::ACTUAL, { 5, -12, 2, 1 });
     search_server.AddDocument(3, "well-groomed starling Evgeniy"s, DocumentStatus::BANNED, { 9 });
     cout << "ACTUAL by default:"s << endl;
     for (const Document& document : search_server.FindTopDocuments("fluffy well-groomed cat"s)) {
@@ -336,6 +345,7 @@ int main(){
     for (const Document& document : search_server.FindTopDocuments("fluffy well-groomed cat"s, [](int document_id, DocumentStatus status, int rating) { return document_id % 2 == 0; })) {
         PrintDocument(document);
     }
+    //cout << search_server.GetDocumentId(2) << endl;
     // Trying to create a search server with special characters in stop-words
     try {
         SearchServer err_search_server("and in o\x12n"s);
@@ -345,7 +355,7 @@ int main(){
     }
     // Trying to add a document with an existing ID
     try {
-        search_server.AddDocument(1, "fluffy dog ​​and fashionable collar"s, DocumentStatus::ACTUAL, { 1, 2 });
+        search_server.AddDocument(98, "fluffy dog ​​and fashionable collar"s, DocumentStatus::ACTUAL, { 1, 2 });
     }
     catch (const invalid_argument& e) {
         cout << "Error: "s << e.what() << endl;
