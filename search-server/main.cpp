@@ -1,62 +1,105 @@
 ﻿#include "document.h"
 #include "paginator.h"
+#include "reader.h"
 #include "read_input_functions.h"
 #include "request_queue.h"
 #include "search_server.h"
 #include "string_processing.h"
 
 #include <iostream>
+#include <string>
+#include <conio.h>
+#include <filesystem>
 
 using namespace std;
 
-int main() 
-try{
-    SearchServer search_server("and in at"s);
+void AddDocuments(Reader& reader, SearchServer& search_server) {
+    for (auto& doc : reader.GetDocuments()) {
+        search_server.AddDocument(doc.id, move(doc.text), doc.status, move(doc.ratings));
+    }
+}
+
+void PrintPages(const vector<Document>& documents, int page_size) {
+    for (const auto page : Paginate(documents, page_size)) {
+
+        cout << page << endl;
+        cout << "Page break"s << endl;
+    }
+}
+
+void PrintMatchDocumentResult(int document_id, const vector<string>& words, DocumentStatus status) {
+    cout << "{ "s
+        << "document_id = "s << document_id << ", "s
+        << "status = "s << status << ", "s
+        << "words ="s;
+    for (const string& word : words) {
+        cout << ' ' << word;
+    }
+    cout << " }"s << endl;
+    cout << "Page break"s << endl;
+}
+
+void PrintResults(Reader& reader, SearchServer& search_server, RequestQueue& request_queue) {
+    for (auto request : reader.GetRequests()) {
+        switch (request.type)
+        {
+        case RequestType::FIND:
+        {
+            cout << "Find request: \'" << request.name << '\'' << endl;
+            PrintPages(request_queue.AddFindRequest(move(request.name)), reader.GetPageSize());
+            break;
+        }
+        case RequestType::TOP:
+        {
+            cout << "Top request: \'" << request.name << '\'' << endl;
+            PrintPages(search_server.FindTopDocuments(move(request.name)), reader.GetPageSize());
+            break;
+        }
+        case RequestType::MATCH:
+        {
+            cout << "Match request: \'" << request.name << "\' with document id: " << request.id << endl;
+            const auto [words, status] = search_server.MatchDocument(move(request.name), request.id);
+            PrintMatchDocumentResult(request.id, words, status);
+            break;
+        }
+        case RequestType::NO_RESULT:
+        {
+            cout << "Total empty requests: "s << request_queue.GetNoResultRequests() << endl;
+            break;
+        }
+        }
+    }
+}
+
+int main(int argc, const char** argv)
+try {
+    if (argc != 2) {
+        cerr << "Usage: "sv << argv[0] << " <in_file>"sv << endl;
+        _getch();
+        return 1;
+    }
+    std::filesystem::path file = argv[1];
+    Reader reader;
+    reader.LoadXML(file.string());
+    SearchServer search_server(move(reader.GetStopWords()));
     RequestQueue request_queue(search_server);
-    search_server.AddDocument(1, "curly cat curly tail"s, DocumentStatus::ACTUAL, { 7, 2, 7 });
-    search_server.AddDocument(2, "curly dog and fancy collar"s, DocumentStatus::ACTUAL, { 1, 2, 3 });
-    search_server.AddDocument(3, "big cat fancy collar "s, DocumentStatus::ACTUAL, { 1, 2, 8 });
-    search_server.AddDocument(4, "big dog sparrow Eugene"s, DocumentStatus::ACTUAL, { 1, 3, 2 });
-    search_server.AddDocument(5, "big dog sparrow Vasiliy"s, DocumentStatus::ACTUAL, { 1, 1, 1 });
-
-    // 1439 queries with zero results
-    for (int i = 0; i < 1439; ++i) {
-        request_queue.AddFindRequest("empty request");
-    }
-    
-    // still 1439 queries with zero result
-    const auto search_results_1 = request_queue.AddFindRequest("curly dog"s);
-    int page_size = 2;
-    const auto pages_1 = Paginate(search_results_1, page_size);
-    // Displaying found documents page by page
-    for (auto page = pages_1.begin(); page != pages_1.end(); ++page) {
-        std::cout << *page << std::endl;
-        std::cout << "Page break"s << std::endl;
-    }
-    // new day, first request deleted, 1438 requests with zero results
-    request_queue.AddFindRequest("big collar"s);
-    // first query deleted, 1437 queries with zero result
-    request_queue.AddFindRequest("sparrow"s);
-    std::cout << "Total empty requests: "s << request_queue.GetNoResultRequests() << std::endl;
-
-    const auto search_results_2 = search_server.FindTopDocuments("curly dog"s);
-    const auto pages_2 = Paginate(search_results_2, page_size);
-    // Displaying found documents page by page
-    for (auto page = pages_2.begin(); page != pages_2.end(); ++page) {
-        std::cout << *page << std::endl;
-        std::cout << "Page break"s << std::endl;
-    }
+    AddDocuments(reader, search_server);
+    PrintResults(reader, search_server, request_queue);
+    _getch();
     return 0;
 }
 
 catch (const invalid_argument& e) {
     cout << "Error: "s << e.what() << endl;
+    _getch();
 }
 
 catch (const out_of_range& e) {
     cout << "Error: "s << e.what() << endl;
+    _getch();
 }
 
 catch (...) {
-    cout << "Unknown exception!"s <<  endl;
+    cout << "Unknown exception!"s << endl;
+    _getch();
 }

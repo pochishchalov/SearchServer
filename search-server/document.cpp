@@ -15,3 +15,18 @@ ostream& operator<<(ostream& os, const Document& document) {
         << "rating = "s << document.rating << " }"s;
     return os;
 }
+
+ostream& operator<<(ostream& os, const DocumentStatus status) {
+    switch (status)
+    {
+    case DocumentStatus::ACTUAL: os << "actual"s;
+        break;
+    case DocumentStatus::BANNED: os << "banned"s;
+        break;
+    case DocumentStatus::IRRELEVANT: os << "irrelevant"s;
+        break;
+    case DocumentStatus::REMOVED: os << "removed"s;
+        break;
+    }
+    return os;
+}
