@@ -20,7 +20,6 @@ struct ReaderDocument {
 
 enum class RequestType {
     FIND,
-    TOP,
     NO_RESULT,
     MATCH
 };
@@ -112,7 +111,8 @@ void Reader::LoadXML(const std::string& file_name) {
                 documents_.emplace_back(AddDocument(iter));
             }
             else if (iter->name() == "stop_words"s) {
-                stop_words_ = iter->value();
+                (stop_words_.empty()) ? stop_words_ += iter->value()
+                    : stop_words_ += ' ' + iter->value();
             }
             else if (iter->name() == "page_size"s) {
                 page_size_ = std::stoi(iter->value());
@@ -120,11 +120,8 @@ void Reader::LoadXML(const std::string& file_name) {
                     throw std::invalid_argument("page size incorrect"s);
                 }
             }
-            else if (iter->name() == "find_request"s) {
+            else if (iter->name() == "find"s) {
                 requests_.emplace_back(Request{ iter->value(), 0, RequestType::FIND });
-            }
-            else if (iter->name() == "top_documents"s) {
-                requests_.emplace_back(Request{ iter->value(), 0, RequestType::TOP });
             }
             else if (iter->name() == "match"s) {
                 Request request;

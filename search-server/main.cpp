@@ -49,12 +49,6 @@ void PrintResults(Reader& reader, SearchServer& search_server, RequestQueue& req
             PrintPages(request_queue.AddFindRequest(move(request.name)), reader.GetPageSize());
             break;
         }
-        case RequestType::TOP:
-        {
-            cout << "Top request: \'" << request.name << '\'' << endl;
-            PrintPages(search_server.FindTopDocuments(move(request.name)), reader.GetPageSize());
-            break;
-        }
         case RequestType::MATCH:
         {
             cout << "Match request: \'" << request.name << "\' with document id: " << request.id << endl;

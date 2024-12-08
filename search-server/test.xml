@@ -2,14 +2,13 @@
 <requests>
 	<stop_words>in at and</stop_words>
 	<page_size>2</page_size>
-	<find_request>empty</find_request>
-	<find_request>curly dog</find_request>
-	<find_request>big collar</find_request>
-	<find_request>sparrow</find_request>
+	<find>empty</find>
+	<find>curly dog</find>
+	<find>big collar</find>
+	<find>sparrow</find>
 	<no_result></no_result>
 	<match id="1" text="curly cat"></match>
 	<match id="2" text="curly cat"></match>
-	<top_documents>curly dog</top_documents>
 	<document id="1" text="curly cat curly tail" status="actual" ratings="7, 2, 7"></document>
 	<document id="2" text="curly dog and fancy collar" status="actual" ratings="1, 2, 3"></document>
 	<document id="3" text="big cat fancy collar" status="actual" ratings="1, 2, 8"></document>
